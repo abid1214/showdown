@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html,body{margin:0}body{font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Showdown</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+  /* Layout: one narrow column like a phone app; the ranked ladder is the page, the duel is a sheet over it. */
+  :root {
+    --bg: #f6f5f1;
+    --surface: #ffffff;
+    --fg: #17191c;
+    --muted: #6b6f78;
+    --line: #e3e1da;
+    --accent: #e4572e;
+    --accent-ink: #ffffff;
+    --loved: #1f8a5b;
+    --liked: #d99a1b;
+    --meh: #8a8f99;
+    --display: "Bricolage Grotesque", "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+    --body: "Instrument Sans", "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141518; --surface: #1e2024; --fg: #f1efe9; --muted: #9a9ea8; --line: #2d3036;
+      --accent: #ff6a3d; --accent-ink: #1a0d08; --loved: #3ec487; --liked: #f0b53a; --meh: #7c818b;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141518; --surface: #1e2024; --fg: #f1efe9; --muted: #9a9ea8; --line: #2d3036;
+    --accent: #ff6a3d; --accent-ink: #1a0d08; --loved: #3ec487; --liked: #f0b53a; --meh: #7c818b;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--fg); font-family: var(--body);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 20px 60px; min-height: 100%;
+    font-size: 15px; line-height: 1.45;
+  }
+  .wrap { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  h1 { font-family: var(--display); font-size: 34px; font-weight: 800; letter-spacing: -0.02em; margin: 0; line-height: 1; }
+  .count { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .tagline { color: var(--muted); font-size: 13.5px; margin: 0; }
+
+  form.add { display: flex; gap: 8px; }
+  form.add input {
+    flex: 1; min-width: 0; font: inherit; font-size: 16px; padding: 12px 14px;
+    border: 1.5px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--fg);
+  }
+  form.add input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+  button { font: inherit; cursor: pointer; }
+  .btn {
+    padding: 12px 18px; border-radius: 12px; border: 0; background: var(--fg); color: var(--bg);
+    font-weight: 600; white-space: nowrap;
+  }
+  .btn:focus-visible, .ghost:focus-visible, .choice:focus-visible, .tier:focus-visible, .row-menu button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .ghost { background: none; border: 0; color: var(--muted); padding: 8px 10px; border-radius: 8px; text-decoration: underline; text-underline-offset: 3px; }
+  .field { flex: 1; min-width: 0; position: relative; }
+  .field input { width: 100%; }
+  .suggest {
+    position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 10; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 12px; box-shadow: 0 10px 28px rgba(0,0,0,.14); padding: 4px; margin: 0; list-style: none; max-height: 300px; overflow-y: auto;
+  }
+  .suggest li { padding: 9px 12px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+  .suggest li.active, .suggest li:hover { background: var(--bg); }
+  .suggest li .have { font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .suggest li.ranked { color: var(--muted); }
+  .suggest li mark { background: none; color: inherit; font-weight: 700; }
+  .tools { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; margin-top: 4px; }
+  .tools .ghost { text-decoration: none; font-size: 13px; }
+  .tools .ghost:hover { color: var(--fg); }
+  .notice { font-size: 13px; color: var(--muted); margin: -8px 0 0; min-height: 1.2em; }
+  .notice.warn { color: var(--accent); }
+
+  .filter { display: flex; gap: 8px; align-items: center; }
+  .filter input { flex: 1; min-width: 0; font: inherit; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--fg); }
+
+  ol.ladder { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .tier-head {
+    display: flex; align-items: center; gap: 10px; margin-top: 14px; margin-bottom: 2px;
+    font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; color: var(--muted);
+  }
+  .tier-head::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  .tier-head .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
+  li.row {
+    display: grid; grid-template-columns: 34px 1fr auto auto; align-items: center; gap: 10px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 8px 10px 12px;
+    position: relative;
+  }
+  li.row::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--c); }
+  .rank { font-family: var(--display); font-weight: 700; font-size: 18px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+  .title { min-width: 0; font-weight: 500; overflow-wrap: anywhere; }
+  .score {
+    font-family: var(--display); font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums;
+    padding: 3px 9px; border-radius: 999px; background: color-mix(in srgb, var(--c) 16%, transparent); color: var(--c);
+  }
+  .row-menu { position: relative; }
+  .row-menu > button { background: none; border: 0; color: var(--muted); font-size: 20px; line-height: 1; padding: 6px 8px; border-radius: 8px; }
+  .row-menu > button:hover { background: var(--bg); }
+  .menu {
+    position: absolute; right: 0; top: 100%; z-index: 5; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 4px; display: flex; flex-direction: column; min-width: 150px;
+  }
+  .menu button { background: none; border: 0; text-align: left; padding: 9px 12px; border-radius: 7px; color: var(--fg); }
+  .menu button:hover { background: var(--bg); }
+  .menu button.danger { color: var(--accent); }
+
+  .empty { text-align: center; color: var(--muted); padding: 48px 12px; border: 1.5px dashed var(--line); border-radius: 16px; }
+  .empty strong { display: block; color: var(--fg); font-family: var(--display); font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+
+  /* The duel sheet */
+  .sheet-bg { position: fixed; inset: 0; background: rgba(10,10,12,.55); z-index: 20; display: flex; align-items: flex-end; justify-content: center; }
+  @media (min-width: 600px) { .sheet-bg { align-items: center; } }
+  .sheet {
+    background: var(--bg); color: var(--fg); width: 100%; max-width: 560px; border-radius: 20px 20px 0 0;
+    padding: 20px max(16px, env(safe-area-inset-left, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-right, 0px));
+    display: flex; flex-direction: column; gap: 16px; max-height: 92%; overflow-y: auto;
+  }
+  @media (min-width: 600px) { .sheet { border-radius: 20px; padding: 24px; } }
+  .sheet-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .step { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .sheet h2 { font-family: var(--display); font-size: 24px; font-weight: 700; margin: 0; line-height: 1.15; text-wrap: balance; letter-spacing: -0.01em; }
+  .sheet .sub { color: var(--muted); margin: -8px 0 0; font-size: 14px; }
+  .tiers { display: grid; gap: 10px; }
+  .tier {
+    display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 14px; border: 1.5px solid var(--line);
+    background: var(--surface); color: var(--fg); text-align: left;
+  }
+  .tier:hover { border-color: var(--c); }
+  .tier .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--c); flex: none; }
+  .tier b { display: block; font-family: var(--display); font-size: 17px; }
+  .tier span { color: var(--muted); font-size: 13px; }
+
+  .duel { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: stretch; }
+  .choice {
+    position: relative; min-height: 150px; padding: 18px 14px; border-radius: 16px; border: 1.5px solid var(--line);
+    background: var(--surface); color: var(--fg); text-align: left; display: flex; flex-direction: column; justify-content: space-between; gap: 10px;
+    transition: transform .08s ease, border-color .08s ease;
+  }
+  .choice:hover { border-color: var(--accent); }
+  .choice:active { transform: scale(.98); }
+  .choice .lbl { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .choice .name { font-family: var(--display); font-size: 20px; font-weight: 700; line-height: 1.15; overflow-wrap: anywhere; }
+  .choice.new .lbl { color: var(--accent); }
+  .choice .pos { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .duel-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .vs { text-align: center; font-family: var(--display); font-weight: 800; color: var(--muted); font-size: 13px; letter-spacing: .1em; margin: -6px 0; }
+
+  .placed { text-align: center; padding: 8px 0; }
+  .placed .big { font-family: var(--display); font-size: 56px; font-weight: 800; line-height: 1; letter-spacing: -0.03em; color: var(--accent); }
+  .placed p { margin: 6px 0 0; color: var(--muted); }
+
+  .foot { color: var(--muted); font-size: 12.5px; text-align: center; margin-top: 8px; }
+  @media (prefers-reduced-motion: reduce) { .choice { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Showdown</h1>
+    <span class="count" id="count"></span>
+  </header>
+  <p class="tagline">Add a show. Pick it or the other one a few times. It lands where it belongs.</p>
+
+  <form class="add" id="addForm">
+    <div class="field">
+      <input id="titleInput" type="text" placeholder="Show title" autocomplete="off" autocapitalize="words" aria-label="Show title" aria-autocomplete="list" maxlength="120">
+      <ul class="suggest" id="suggest" role="listbox" hidden></ul>
+    </div>
+    <button class="btn" id="addBtn" type="submit">Rank it</button>
+  </form>
+  <p class="notice" id="notice"></p>
+
+  <div class="filter" id="filterRow" hidden>
+    <input id="filterInput" type="search" placeholder="Find in your list" aria-label="Find in your list">
+  </div>
+
+  <div id="list"></div>
+  <div class="tools" id="tools" hidden>
+    <button class="ghost" id="copyBtn" type="button">Copy list as text</button>
+    <button class="ghost" id="exportBtn" type="button" hidden>Export backup</button>
+    <button class="ghost" id="importBtn" type="button" hidden>Import backup</button>
+    <input id="importFile" type="file" accept="application/json,.json" hidden>
+  </div>
+  <p class="foot" id="foot"></p>
+</div>
+
+<div id="sheetRoot"></div>
+
+<script>
+(function () {
+  var TIERS = {
+    loved: { name: "Loved it", hint: "Would rewatch, would recommend", lo: 7.5, hi: 10, color: "var(--loved)" },
+    liked: { name: "Liked it", hint: "Glad I watched, not a favorite", lo: 5, hi: 7.5, color: "var(--liked)" },
+    meh:   { name: "Not for me", hint: "Dropped it or wished I had", lo: 0, hi: 5, color: "var(--meh)" }
+  };
+  var TIER_ORDER = ["loved", "liked", "meh"];
+  var STANDALONE = !(window.claude && window.claude.use);
+  var SHOWS = [
+    "30 Rock","3 Body Problem","Abbott Elementary","Adventure Time","Alias","Ally McBeal","American Crime Story","American Horror Story","American Idol","American Vandal","Andor","Angel","Archer","Arrested Development","Arrow","Atlanta","Attack on Titan","Avatar: The Last Airbender",
+    "Baby Reindeer","Band of Brothers","Banshee","Barry","Bates Motel","Battlestar Galactica (2004)","Beef","Better Call Saul","Big Little Lies","Big Mouth","Black Mirror","Black Sails","Bleach","Blue Eye Samurai","Bluey","Boardwalk Empire","Bob's Burgers","BoJack Horseman","Bones","Bosch","Boston Legal","Breaking Bad","Bridgerton","Broad City","Brooklyn Nine-Nine","Buffy the Vampire Slayer",
+    "Californication","Carnival Row","Castle","Castlevania","Chainsaw Man","Cheers","Chernobyl","Chuck","Cobra Kai","Code Geass","Columbo","Community","Counterpart","Cowboy Bebop","Criminal Minds","Cunk on Earth","Curb Your Enthusiasm",
+    "Dark","Daredevil","Dead to Me","Deadwood","Death Note","Derry Girls","Desperate Housewives","Devs","Dexter","Doctor Who","Documentary Now!","Dollhouse","Downton Abbey","Dragon Ball Z","Drive to Survive",
+    "Entourage","Euphoria","Everybody Loves Raymond","Evil","Expedition Unknown",
+    "Fallout","Fargo","Fawlty Towers","Firefly","Fleabag","Fleishman Is in Trouble","Foundation","Frasier","Freaks and Geeks","Friday Night Lights","Friends","Fringe","From","Frieren: Beyond Journey's End","Fullmetal Alchemist: Brotherhood","Futurama",
+    "Game of Thrones","Gen V","Ghosts (US)","Ghosts (UK)","Gilmore Girls","Girls","Glee","Good Omens","Gossip Girl","Gravity Falls","Grey's Anatomy",
+    "Hacks","Halt and Catch Fire","Hannibal","Happy Valley","Heartstopper","Heroes","Hijack","His Dark Materials","Homeland","House","House of Cards","House of the Dragon","How I Met Your Mother","How to Get Away with Murder","Hunter x Hunter",
+    "I May Destroy You","I Think You Should Leave","Industry","Insecure","Interview with the Vampire","Invincible","It's Always Sunny in Philadelphia",
+    "Jack Ryan","Jane the Virgin","Jeopardy!","Jessica Jones","JoJo's Bizarre Adventure","Jujutsu Kaisen","Justified",
+    "Key & Peele","Killing Eve","King of the Hill",
+    "Last Week Tonight","Legion","Letterkenny","Lie to Me","Line of Duty","Lost","Love Is Blind","Loki","Lucifer","Luther",
+    "Mad Men","Malcolm in the Middle","Mare of Easttown","Master of None","Masters of the Air","Mindhunter","Modern Family","Money Heist","Monk","Monster","Mr. Robot","Mushi-Shi","My Hero Academia","Mythic Quest",
+    "Narcos","Nathan for You","Naruto","Neon Genesis Evangelion","New Girl","Normal People",
+    "Obi-Wan Kenobi","One Piece","One Punch Man","Only Murders in the Building","Orange Is the New Black","Orphan Black","Outer Banks","Outlander","Oz","Ozark",
+    "Pachinko","Parks and Recreation","Peacemaker","Peaky Blinders","Pen15","Penny Dreadful","Person of Interest","Poker Face","Pose","Prison Break","Psych","Pushing Daisies",
+    "Queer Eye",
+    "Rectify","Reservation Dogs","Rick and Morty","Ripley","Rome","RuPaul's Drag Race","Russian Doll",
+    "Samurai Champloo","Scandal","Schitt's Creek","Scrubs","Seinfeld","Severance","Sex Education","Shameless (US)","Sherlock","Shogun","Shrinking","Silicon Valley","Six Feet Under","Slow Horses","Smallville","Sons of Anarchy","South Park","Spartacus","Spy x Family","Squid Game","Star Trek: Deep Space Nine","Star Trek: Discovery","Star Trek: Strange New Worlds","Star Trek: The Next Generation","Star Wars: The Clone Wars","Stargate SG-1","Station Eleven","Steins;Gate","Steven Universe","Stranger Things","Succession","Suits","Supernatural","Survivor",
+    "Taskmaster","Ted Lasso","The 100","The Americans","The Bear","The Big Bang Theory","The Blacklist","The Boys","The Crown","The Curse","The Diplomat","The Expanse","The Fall of the House of Usher","The Flash","The Fresh Prince of Bel-Air","The Gilded Age","The Good Place","The Good Wife","The Great","The Great British Bake Off","The Handmaid's Tale","The Haunting of Hill House","The IT Crowd","The Inbetweeners","The Last Kingdom","The Last of Us","The Legend of Korra","The Leftovers","The Mandalorian","The Marvelous Mrs. Maisel","The Mentalist","The Mighty Boosh","The Morning Show","The Newsroom","The Night Of","The Office (UK)","The Office (US)","The Orville","The Other Two","The Penguin","The Queen's Gambit","The Rehearsal","The Righteous Gemstones","The Shield","The Simpsons","The Sinner","The Sopranos","The Studio","The Terror","The Thick of It","The Twilight Zone","The Umbrella Academy","The Vampire Diaries","The Venture Bros.","The Walking Dead","The West Wing","The White Lotus","The Wire","The Witcher","The X-Files","This Is Us","Tokyo Vice","Top Boy","Top Gear","Trailer Park Boys","True Blood","True Detective","Twin Peaks",
+    "Unbreakable Kimmy Schmidt","Undone","Utopia (UK)",
+    "Veep","Vikings","Vinland Saga",
+    "WandaVision","Watchmen","Weeds","Westworld","What We Do in the Shadows","White Collar","Will & Grace",
+    "X-Men '97",
+    "Yellowjackets","Yellowstone","You","Young Sheldon",
+    "Zoey's Extraordinary Playlist"
+  ];
+
+  var shows = [];          // ordered best -> worst, grouped by tier
+  var filter = "";
+  var store = null;        // { save(shows) } once ready
+  var openMenu = null;
+  var duel = null;         // in-progress insertion
+
+  var $ = function (id) { return document.getElementById(id); };
+  var el = function (tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  };
+
+  // ---------- scoring & helpers ----------
+  function tierBounds(tier) {
+    var lo = -1, hi = -1;
+    for (var i = 0; i < shows.length; i++) {
+      if (shows[i].tier === tier) { if (lo < 0) lo = i; hi = i + 1; }
+    }
+    if (lo < 0) {
+      // Empty tier: it sits after all better tiers.
+      var pos = 0;
+      for (var t = 0; t < TIER_ORDER.indexOf(tier); t++) {
+        for (var j = 0; j < shows.length; j++) if (shows[j].tier === TIER_ORDER[t]) pos = j + 1;
+      }
+      return [pos, pos];
+    }
+    return [lo, hi];
+  }
+  function scoreOf(index) {
+    var s = shows[index];
+    var b = tierBounds(s.tier);
+    var n = b[1] - b[0];
+    var i = index - b[0];
+    var t = TIERS[s.tier];
+    var v = t.hi - (t.hi - t.lo) * (i / Math.max(n, 1));
+    return v.toFixed(1);
+  }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+  function sameTitle(a, b) { return a.trim().toLowerCase() === b.trim().toLowerCase(); }
+
+  // ---------- rendering ----------
+  function render() {
+    var list = $("list");
+    list.textContent = "";
+    $("count").textContent = shows.length ? shows.length + (shows.length === 1 ? " show" : " shows") : "";
+    $("filterRow").hidden = shows.length < 6;
+    $("tools").hidden = !shows.length;
+
+    if (!shows.length) {
+      var e = el("div", "empty");
+      e.appendChild(el("strong", null, "Nothing ranked yet"));
+      e.appendChild(document.createTextNode("Type a show above. Your first one goes straight to #1."));
+      list.appendChild(e);
+      return;
+    }
+
+    var q = filter.trim().toLowerCase();
+    var ol = el("ol", "ladder");
+    var lastTier = null;
+    var shown = 0;
+    shows.forEach(function (s, i) {
+      if (q && s.title.toLowerCase().indexOf(q) < 0) return;
+      shown++;
+      if (s.tier !== lastTier) {
+        lastTier = s.tier;
+        var h = el("div", "tier-head");
+        h.style.setProperty("--c", TIERS[s.tier].color);
+        h.appendChild(el("span", "dot"));
+        h.appendChild(el("span", null, TIERS[s.tier].name));
+        ol.appendChild(h);
+      }
+      var li = el("li", "row");
+      li.style.setProperty("--c", TIERS[s.tier].color);
+      li.appendChild(el("span", "rank", String(i + 1)));
+      li.appendChild(el("span", "title", s.title));
+      li.appendChild(el("span", "score", scoreOf(i)));
+      li.appendChild(rowMenu(s, i));
+      ol.appendChild(li);
+    });
+    if (!shown) ol.appendChild(el("div", "empty", "No show matches that."));
+    list.appendChild(ol);
+  }
+
+  function rowMenu(s, i) {
+    var wrap = el("div", "row-menu");
+    var btn = el("button", null, "⋯");
+    btn.setAttribute("aria-label", "Options for " + s.title);
+    btn.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      if (openMenu && openMenu.parentNode === wrap) { closeMenu(); return; }
+      closeMenu();
+      var m = el("div", "menu");
+      var re = el("button", null, "Re-rank");
+      re.addEventListener("click", function () {
+        closeMenu();
+        var removed = shows.splice(i, 1)[0];
+        startDuel(removed.title, removed.id);
+      });
+      var del = el("button", "danger", "Remove");
+      del.addEventListener("click", function () {
+        closeMenu();
+        shows.splice(i, 1);
+        persist();
+        render();
+        setNotice("Removed " + s.title + ".");
+      });
+      m.appendChild(re); m.appendChild(del);
+      wrap.appendChild(m);
+      openMenu = m;
+    });
+    wrap.appendChild(btn);
+    return wrap;
+  }
+  function closeMenu() { if (openMenu) { openMenu.remove(); openMenu = null; } }
+  document.addEventListener("click", closeMenu);
+
+  function setNotice(text, warn) {
+    var n = $("notice");
+    n.textContent = text || "";
+    n.className = "notice" + (warn ? " warn" : "");
+  }
+
+  // ---------- the duel (binary insertion) ----------
+  function startDuel(title, id) {
+    duel = { title: title, id: id || uid(), tier: null, lo: 0, hi: 0, history: [], asked: 0 };
+    renderSheet();
+  }
+  function cancelDuel() {
+    duel = null;
+    renderSheet();
+    render();
+  }
+  function chooseTier(tier) {
+    duel.tier = tier;
+    var b = tierBounds(tier);
+    duel.lo = b[0]; duel.hi = b[1];
+    duel.start = b;
+    duel.asked = 0;
+    if (duel.lo === duel.hi) return place(duel.lo);
+    renderSheet();
+  }
+  function answer(preferNew) {
+    var mid = Math.floor((duel.lo + duel.hi) / 2);
+    duel.history.push([duel.lo, duel.hi]);
+    duel.asked++;
+    if (preferNew) duel.hi = mid; else duel.lo = mid + 1;
+    if (duel.lo >= duel.hi) return place(duel.lo);
+    renderSheet();
+  }
+  function tooClose() {
+    var mid = Math.floor((duel.lo + duel.hi) / 2);
+    place(mid + 1);
+  }
+  function back() {
+    if (!duel.history.length) { duel.tier = null; renderSheet(); return; }
+    var h = duel.history.pop();
+    duel.lo = h[0]; duel.hi = h[1]; duel.asked--;
+    renderSheet();
+  }
+  function place(index) {
+    shows.splice(index, 0, { id: duel.id, title: duel.title, tier: duel.tier, addedAt: Date.now() });
+    persist();
+    duel.placedAt = index;
+    renderSheet();
+    render();
+  }
+
+  function renderSheet() {
+    var root = $("sheetRoot");
+    root.textContent = "";
+    if (!duel) return;
+
+    var bg = el("div", "sheet-bg");
+    var sheet = el("div", "sheet");
+    sheet.setAttribute("role", "dialog");
+    sheet.setAttribute("aria-modal", "true");
+    bg.appendChild(sheet);
+    bg.addEventListener("click", function (ev) { if (ev.target === bg && duel.placedAt == null) cancelDuel(); });
+
+    var top = el("div", "sheet-top");
+    var step = el("span", "step");
+    var cancel = el("button", "ghost", duel.placedAt == null ? "Cancel" : "Done");
+    cancel.addEventListener("click", cancelDuel);
+    top.appendChild(step); top.appendChild(cancel);
+    sheet.appendChild(top);
+
+    if (duel.placedAt != null) {
+      step.textContent = "Placed";
+      var p = el("div", "placed");
+      p.appendChild(el("div", "big", "#" + (duel.placedAt + 1)));
+      var line = el("p");
+      line.appendChild(el("strong", null, duel.title));
+      line.appendChild(document.createTextNode(" · " + TIERS[duel.tier].name + " · " + scoreOf(duel.placedAt)));
+      p.appendChild(line);
+      p.appendChild(el("p", null, duel.asked ? "Settled in " + duel.asked + (duel.asked === 1 ? " comparison." : " comparisons.") : "First in its tier, no comparison needed."));
+      sheet.appendChild(p);
+      var again = el("button", "btn", "Rank another");
+      again.addEventListener("click", function () { cancelDuel(); $("titleInput").focus(); });
+      sheet.appendChild(again);
+    } else if (!duel.tier) {
+      step.textContent = "Step 1";
+      sheet.appendChild(el("h2", null, "How was " + duel.title + "?"));
+      sheet.appendChild(el("p", "sub", "This picks the shelf. The next step finds the exact spot."));
+      var tiers = el("div", "tiers");
+      TIER_ORDER.forEach(function (key) {
+        var t = TIERS[key];
+        var b = el("button", "tier");
+        b.style.setProperty("--c", t.color);
+        b.appendChild(el("span", "dot"));
+        var txt = el("div");
+        txt.appendChild(el("b", null, t.name));
+        txt.appendChild(el("span", null, t.hint));
+        b.appendChild(txt);
+        b.addEventListener("click", function () { chooseTier(key); });
+        tiers.appendChild(b);
+      });
+      sheet.appendChild(tiers);
+    } else {
+      var remaining = Math.ceil(Math.log2(duel.hi - duel.lo + 1));
+      step.textContent = "Comparison " + (duel.asked + 1) + " · about " + remaining + " left";
+      var mid = Math.floor((duel.lo + duel.hi) / 2);
+      var other = shows[mid];
+      sheet.appendChild(el("h2", null, "Which do you like more?"));
+
+      var grid = el("div", "duel");
+      var a = el("button", "choice new");
+      a.appendChild(el("span", "lbl", "New"));
+      a.appendChild(el("span", "name", duel.title));
+      a.appendChild(el("span", "pos", TIERS[duel.tier].name));
+      a.addEventListener("click", function () { answer(true); });
+      var b2 = el("button", "choice");
+      b2.appendChild(el("span", "lbl", "Ranked"));
+      b2.appendChild(el("span", "name", other.title));
+      b2.appendChild(el("span", "pos", "#" + (mid + 1) + " · " + scoreOf(mid)));
+      b2.addEventListener("click", function () { answer(false); });
+      grid.appendChild(a); grid.appendChild(b2);
+      sheet.appendChild(grid);
+
+      var acts = el("div", "duel-actions");
+      var bk = el("button", "ghost", "Back");
+      bk.addEventListener("click", back);
+      var tc = el("button", "ghost", "Too close to call");
+      tc.addEventListener("click", tooClose);
+      acts.appendChild(bk); acts.appendChild(tc);
+      sheet.appendChild(acts);
+    }
+    root.appendChild(bg);
+    var first = sheet.querySelector("button.tier, button.choice, button.btn");
+    if (first) first.focus();
+  }
+
+  document.addEventListener("keydown", function (ev) {
+    if (!duel) return;
+    if (ev.key === "Escape" && duel.placedAt == null) cancelDuel();
+    if (duel.tier && duel.placedAt == null) {
+      if (ev.key === "ArrowLeft") answer(true);
+      if (ev.key === "ArrowRight") answer(false);
+    }
+  });
+
+  // ---------- add form ----------
+  $("addForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var t = $("titleInput").value.trim();
+    if (!t) return;
+    var dup = shows.filter(function (s) { return sameTitle(s.title, t); })[0];
+    if (dup) {
+      setNotice(dup.title + " is already ranked #" + (shows.indexOf(dup) + 1) + ". Use its menu to re-rank it.", true);
+      return;
+    }
+    setNotice("");
+    $("titleInput").value = "";
+    startDuel(t);
+  });
+  $("filterInput").addEventListener("input", function () { filter = this.value; render(); });
+
+  // ---------- autocomplete ----------
+  var sug = $("suggest"), sugItems = [], sugActive = -1;
+  function rankedIndex(title) {
+    for (var i = 0; i < shows.length; i++) if (sameTitle(shows[i].title, title)) return i;
+    return -1;
+  }
+  function suggestFor(q) {
+    q = q.trim().toLowerCase();
+    if (q.length < 1) return [];
+    var starts = [], words = [], inside = [];
+    for (var i = 0; i < SHOWS.length; i++) {
+      var t = SHOWS[i], l = t.toLowerCase();
+      var at = l.indexOf(q);
+      if (at < 0) continue;
+      if (at === 0 || (l.indexOf("the ") === 0 && at === 4)) starts.push(t);
+      else if (l[at - 1] === " " || l[at - 1] === ":" || l[at - 1] === "(") words.push(t);
+      else inside.push(t);
+    }
+    return starts.concat(words, inside).slice(0, 8);
+  }
+  function hideSuggest() { sug.hidden = true; sug.textContent = ""; sugItems = []; sugActive = -1; }
+  function showSuggest() {
+    var q = $("titleInput").value;
+    sugItems = suggestFor(q);
+    sug.textContent = "";
+    sugActive = -1;
+    if (!sugItems.length) { sug.hidden = true; return; }
+    var ql = q.trim().toLowerCase();
+    sugItems.forEach(function (t, i) {
+      var li = el("li");
+      li.setAttribute("role", "option");
+      var at = t.toLowerCase().indexOf(ql);
+      li.appendChild(document.createTextNode(t.slice(0, at)));
+      li.appendChild(el("mark", null, t.slice(at, at + ql.length)));
+      li.appendChild(document.createTextNode(t.slice(at + ql.length)));
+      var r = rankedIndex(t);
+      if (r >= 0) { li.classList.add("ranked"); li.appendChild(el("span", "have", "#" + (r + 1))); }
+      li.addEventListener("mousedown", function (ev) { ev.preventDefault(); pickSuggest(i); });
+      sug.appendChild(li);
+    });
+    sug.hidden = false;
+  }
+  function pickSuggest(i) {
+    var t = sugItems[i];
+    hideSuggest();
+    $("titleInput").value = t;
+    $("addForm").requestSubmit ? $("addForm").requestSubmit() : $("addForm").dispatchEvent(new Event("submit", { cancelable: true }));
+  }
+  $("titleInput").addEventListener("input", showSuggest);
+  $("titleInput").addEventListener("focus", showSuggest);
+  $("titleInput").addEventListener("blur", function () { setTimeout(hideSuggest, 120); });
+  $("titleInput").addEventListener("keydown", function (ev) {
+    if (sug.hidden) return;
+    if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+      ev.preventDefault();
+      var n = sugItems.length;
+      sugActive = ev.key === "ArrowDown" ? (sugActive + 1) % n : (sugActive - 1 + n) % n;
+      Array.prototype.forEach.call(sug.children, function (c, i) { c.classList.toggle("active", i === sugActive); });
+      sug.children[sugActive].scrollIntoView({ block: "nearest" });
+    } else if (ev.key === "Enter" && sugActive >= 0) {
+      ev.preventDefault();
+      pickSuggest(sugActive);
+    } else if (ev.key === "Escape") {
+      hideSuggest();
+    }
+  });
+
+  // ---------- copy / export / import ----------
+  function listAsText() {
+    var out = [];
+    shows.forEach(function (s, i) { out.push((i + 1) + ". " + s.title + "  (" + scoreOf(i) + ")"); });
+    return out.join("\n");
+  }
+  $("copyBtn").addEventListener("click", function () {
+    var text = listAsText();
+    var done = function () { setNotice("Copied " + shows.length + " shows to the clipboard."); };
+    var fallback = function () {
+      var ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); done(); } catch (e) { setNotice("Copy failed. Select the list and copy it by hand.", true); }
+      ta.remove();
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallback);
+    else fallback();
+  });
+  $("exportBtn").addEventListener("click", function () {
+    var blob = new Blob([JSON.stringify({ app: "showdown", exported: new Date().toISOString(), shows: shows }, null, 2)], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "showdown-backup.json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+  });
+  $("importBtn").addEventListener("click", function () { $("importFile").click(); });
+  $("importFile").addEventListener("change", function () {
+    var f = this.files && this.files[0];
+    this.value = "";
+    if (!f) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var d = JSON.parse(reader.result);
+        var list = Array.isArray(d) ? d : d && Array.isArray(d.shows) ? d.shows : null;
+        if (!list) throw new Error("no list");
+        var clean = list.filter(function (s) { return s && typeof s.title === "string"; }).map(function (s) {
+          return { id: s.id || uid(), title: s.title, tier: TIERS[s.tier] ? s.tier : "liked", addedAt: s.addedAt || Date.now() };
+        });
+        // Keep tier grouping intact even if the file was hand-edited.
+        var grouped = [];
+        TIER_ORDER.forEach(function (t) { clean.forEach(function (s) { if (s.tier === t) grouped.push(s); }); });
+        shows = grouped;
+        persist(); render();
+        setNotice("Imported " + shows.length + " shows. This replaced the previous list.");
+      } catch (e) {
+        setNotice("That file is not a Showdown backup.", true);
+      }
+    };
+    reader.readAsText(f);
+  });
+  if (STANDALONE) { $("exportBtn").hidden = false; $("importBtn").hidden = false; }
+
+  // ---------- persistence ----------
+  var saving = false, pending = null;
+  function persist() {
+    if (!store) return;
+    if (saving) { pending = shows.slice(); return; }
+    saving = true;
+    store.save(shows.slice()).catch(function (e) {
+      setNotice("Could not save: " + (e && e.message ? e.message : "unknown error"), true);
+    }).then(function () {
+      saving = false;
+      if (pending) { var p = pending; pending = null; saving = true; store.save(p).catch(function(){}).then(function(){ saving = false; }); }
+    });
+  }
+
+  function localStore() {
+    var KEY = "showdown.shows";
+    try { var raw = localStorage.getItem(KEY); if (raw) shows = JSON.parse(raw); } catch (e) {}
+    store = { save: function (list) { try { localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) {} return Promise.resolve(); } };
+    $("foot").textContent = STANDALONE ? "Saved in this browser. Export a backup to keep it safe or move it." : "Saved in this browser only.";
+    render();
+  }
+
+  render();
+  (async function boot() {
+    var db = null;
+    try { db = await (window.claude && window.claude.use ? window.claude.use("db") : Promise.resolve(null)); } catch (e) {}
+    if (!db) { localStore(); return; }
+    var ref = db.doc("rankings/shows");
+    var unsub = ref.onSnapshot(function (snap) {
+      var d = snap.exists ? snap.data() : null;
+      var incoming = d && Array.isArray(d.shows) ? d.shows : [];
+      // Ignore echoes of our own in-flight write; otherwise adopt the server's view.
+      if (!snap.metadata.hasPendingWrites || !store) {
+        shows = incoming.map(function (s) { return { id: s.id, title: String(s.title), tier: TIERS[s.tier] ? s.tier : "liked", addedAt: s.addedAt }; });
+        if (!store) store = { save: function (list) { return ref.set({ shows: list, updatedAt: Date.now() }); } };
+        $("foot").textContent = "Saved to your account.";
+        if (!duel) render();
+      }
+    }, function (err) {
+      if (!store) localStore();
+      else setNotice("Live sync stopped (" + err.code + "). Reload to reconnect.", true);
+    });
+    setTimeout(function () { if (!store) { unsub(); localStore(); } }, 10000);
+  })();
+})();
+</script>
+
+</body>
+</html>
